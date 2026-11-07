@@ -35,6 +35,13 @@ Testado com Python 3.13, NumPy 2.5, SciPy 1.18 e Matplotlib 3.11.
 | `python rfem.py 1000` | convergência de malha e Monte Carlo da reprodução de Ahmed e Hussain (2020) → `out/resultados.json`, `out/s_*.npy` | Tabelas 1 e 4 | 25 min |
 | `python fg02.py 5000` | exemplos de Fenton e Griffiths (2002) → `out/fg02_resultados.json` | Tabela 3 | 2 min |
 | `python plot.py` | gráfico a partir de `out/resultados.json` → `out/fig_resultados.png` | Figura 2 | segundos |
+| `python cenarios.py convergencia` | estudo de malha dos cenários → `out/cenarios/convergencia.json` | seção 5.6 | segundos |
+| `python cenarios.py base 2000` | caso base de C1–C4 → `out/cenarios/base.json` e `*.npy` | Tabela 5 | 15 min |
+| `python cenarios.py grade C2 2000` | grade COV × θ do cenário C2 | Figura 4, Tabela 6 | 35 min |
+| `python cenarios.py grade C4 2000` | grade COV × θ do cenário C4 (s = 4B) | Figura 5, Tabela 6 | 65 min |
+| `python cenarios.py aniso 2000` | campo anisotrópico (θh = 40 m, θv = 2 m) | seção 5.9 | 5 min |
+| `python cenarios.py h4 2000` | C4 com θ = 50 e 200 m (hipótese H4) | seção 5.8 | 5 min |
+| `python posproc.py` | recalques dimensionais, probabilidades, índices de Sobol → `out/cenarios/resumo.json`, `fig_*.png` | Tabelas 5–6, Figuras 3–5 | < 1 min |
 
 As sementes aleatórias são fixas (`20261106`), de modo que os números se repetem a cada execução.
 A pasta `out/` já contém os resultados usados no texto.
@@ -49,10 +56,25 @@ A pasta `out/` já contém os resultados usados no texto.
   *Journal of Engineering Mechanics*, v. 116, n. 8, p. 1733-1749, 1990.
 - POULOS, H. G.; DAVIS, E. H. *Elastic solutions for soil and rock mechanics*. New York: Wiley, 1974.
 
+## Cenários (C1–C4)
+
+`cenarios.py` grava o recalque **normalizado** g = δ·μE/(q·B). Como o modelo é linear, uma simulação por
+(geometria, COV_E, θ) serve para qualquer módulo médio μE e pressão q, aplicados em `posproc.py`:
+
+    δ = q · B · g / μE
+
+| Cenário | Equipamento | B (m) | H |
+|---|---|---|---|
+| C1 | britador cônico Kubria G150 (37 t) | 3,50 | 3B |
+| C2 | britador cônico Kubria M210 (77 t) | 4,20 | 3B |
+| C3 | radier de moinho de bolas (Han e Guevara, 2013) | 21,0 | B |
+| C4 | dois G150, afastamento 2B, 4B e 6B | 3,50 | 3B |
+
+Caso base: μE = 40 MPa, COV_E = 0,4, θ = 2 m, ν = 0,3, razão de massas bloco/máquina MR = 3.
+
 ## Em andamento
 
-- `cenarios.py`: cenários de fundação de equipamentos C1–C4 (britadores cônicos, moinho de bolas, par de sapatas).
-- Anisotropia (θh ≠ θv), análise de sensibilidade (índices de Sobol) e verificação cruzada em FEniCSx.
+- Verificação cruzada em FEniCSx.
 
 ## Licença
 
