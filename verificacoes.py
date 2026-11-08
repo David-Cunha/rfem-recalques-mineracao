@@ -7,7 +7,7 @@ Verificacoes complementares citadas no texto (seções 5.2, 5.5 e 5.9 da monogra
    com s2 = ln(1 + COV^2) e gamma = funcao de variancia da media sobre B x H (aqui B = 1 m, H = 2 m).
    Limites: gamma -> 0 e gamma -> 1.
 2) Testes de lognormalidade (Kolmogorov-Smirnov e Anderson-Darling, 5 %) nos 15 casos da reproducao.
-3) Fatores de Harr (1966 apud VELLOSO; LOPES, 2011, p. 94, Tab. 5.2): razao entre o fator h*Ih da
+3) Fatores de Harr (1966 apud VELLOSO; LOPES, 2011, p. 95, Tab. 5.2): razao entre o fator h*Ih da
    faixa infinita e o do retangulo das fundacoes de C1 e C2 (carga flexivel, centro, camada finita).
 
 Uso: python verificacoes.py   (le out/resultados.json e out/s_*.npy; grava out/verificacoes.json)
