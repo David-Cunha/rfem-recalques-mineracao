@@ -2,3 +2,4 @@ numpy>=1.24,<3
 scipy>=1.10,<2
 matplotlib>=3.7,<4
 # testado com numpy 2.5.3, scipy 1.18.1, matplotlib 3.11.2 (Python 3.13)
+scikit-fem>=10
