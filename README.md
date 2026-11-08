@@ -41,6 +41,7 @@ Testado com Python 3.13, NumPy 2.5, SciPy 1.18 e Matplotlib 3.11.
 | `python cenarios.py grade C2 2000` | grade COV × θ do cenário C2 | Figura 4, Tabela 8 | 35 min |
 | `python cenarios.py grade C3 2000` | grade COV × θ do cenário C3 (s = 4B) | Figura 5, Tabela 8 | 65 min |
 | `python cenarios.py aniso 2000` | campo anisotrópico (θh = 40 m, θv = 2 m) | seção 5.8 | 5 min |
+| `python cenarios.py aniso_local 2000` | θh = 20 e 40 m, θv = 8 m (escalas locais de Natal: Cunha, 2016; Lucena, 2018) | seção 5.8 | 7 min |
 | `python cenarios.py tendencia 2000` | C2 com módulo crescente com a profundidade | seção 5.8 | 3 min |
 | `python cenarios.py h4 2000` | C3 com θ = 10, 14, 30, 50 e 200 m | seção 5.7 | 12 min |
 | `python posproc.py` | probabilidades, módulo mínimo, Sobol, lognormalidade → `out/cenarios/resumo.json`, `fig_*.png` | Tabelas 6–8, Figuras 3–5 | 1 min |

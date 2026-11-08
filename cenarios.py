@@ -21,6 +21,7 @@ Uso:
   python cenarios.py base [N]              # caso base (COV 0,4; theta 2 m) de todos os cenarios
   python cenarios.py grade CENARIO [N]     # grade COV x theta (CENARIO = C2 ou C3)
   python cenarios.py aniso [N]             # thh = 40 m, thv = 2 m em C2 e C3
+  python cenarios.py aniso_local [N]       # thh = 20 e 40 m, thv = 8 m (alcances locais, UFRN) em C2 e C3
   python cenarios.py h4 [N]                # C3_4B, COV 0,4, theta = 10, 14, 30, 50 e 200 m (pico do diferencial)
   python cenarios.py tendencia [N]         # C2 com modulo crescente com a profundidade (caso base)
 """
@@ -179,6 +180,12 @@ if __name__ == "__main__":
         N = int(sys.argv[2]) if len(sys.argv) > 2 else 2000
         rng = np.random.default_rng(SEED + 2)
         rows = [simulate(n, 0.4, 40.0, 2.0, N, rng) for n in ("C2", "C3_4B")]
+        save(rows, "aniso.json")
+    elif mode == "aniso_local":
+        # theta = 0,75 a (variograma esferico): thh ~ 17-54 m (Cunha, 2016; Lucena, 2018), thv ~ 6-9 m (Lucena, 2018)
+        N = int(sys.argv[2]) if len(sys.argv) > 2 else 2000
+        rng = np.random.default_rng(SEED + 5)
+        rows = [simulate(n, 0.4, thh, 8.0, N, rng) for thh in (20.0, 40.0) for n in ("C2", "C3_4B")]
         save(rows, "aniso.json")
     elif mode == "h4":
         N = int(sys.argv[2]) if len(sys.argv) > 2 else 2000

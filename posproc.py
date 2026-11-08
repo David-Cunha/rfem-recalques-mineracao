@@ -220,10 +220,18 @@ if __name__ == "__main__":
 
     # anisotropia, tendencia, H4
     res["aniso"] = {}
+    res["aniso_local"] = {}
     for r in json.load(open(os.path.join(D, "aniso.json"))):
-        G = load(r["cenario"], 0.4, 40.0, 2.0)
+        G = load(r["cenario"], 0.4, r["theta_x"], r["theta_y"])
         s = stats_single(r["cenario"], G, g_det=r["g_det"]); s.update(inc_pct=100 * (r["g_mean"] / r["g_det"] - 1))
-        res["aniso"][r["cenario"]] = s
+        if (r["theta_x"], r["theta_y"]) == (40.0, 2.0):
+            res["aniso"][r["cenario"]] = s
+        else:  # alcances locais (thv = 8 m)
+            if r["cenario"] in ("C1", "C2"):
+                qB = pressures(r["cenario"])[1] * B_of(r["cenario"])
+                s.update(mu_min_c_MPa=mu_min(G[:, 0], qB) / 1e3,
+                         mu_min_d_MPa=mu_min(G[:, 0] / eps_samples(len(G), COVT), qB) / 1e3)
+            res["aniso_local"][f'{r["cenario"]}_thh{r["theta_x"]:g}_thv{r["theta_y"]:g}'] = s
     tp = os.path.join(D, "tendencia.json")
     if os.path.exists(tp):
         r = json.load(open(tp))[0]; G = load("C2", 0.4, 2.0, 2.0, "_tend")
@@ -252,7 +260,7 @@ if __name__ == "__main__":
     cast = lambda o: float(o) if isinstance(o, np.floating) else (bool(o) if isinstance(o, np.bool_) else o)
     json.dump(res, open(os.path.join(D, "resumo.json"), "w"), indent=1, default=cast)
     for k in ("modulo_minimo_MPa", "sobol_C2_P25_faixa_larga", "sobol_C2_P25_muE_35_45", "sobol_C2_P95_muE40",
-              "sobol_C3_beta95", "h4_dd_mean_mm"):
+              "sobol_C3_beta95", "h4_dd_mean_mm", "aniso", "aniso_local"):
         print(k, json.dumps(res[k], default=cast))
     print("lognormalidade: n =", res["lognormalidade"]["n"], "KS rej =", res["lognormalidade"]["rejeicoes_KS"],
           "AD rej =", res["lognormalidade"]["rejeicoes_AD"])
