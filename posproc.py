@@ -12,7 +12,8 @@ Criterios de modulo minimo para delta <= 25 mm (C1 e C2, caso base):
   (a) deterministico com o modulo medio;
   (b) deterministico com o modulo caracteristico E_k = (0,4/0,6) muE (limite inferior de Sandroni);
   (c) probabilistico, P(delta > 25 mm) <= 5 %, so variabilidade espacial;
-  (d) como (c), com incerteza de transformacao COV_t = 0,2 (hipotese).
+  (d) como (c), com incerteza de transformacao COV_t = 0,28 (correlacao local de Phoon e Kulhawy, 1999b);
+  (e) como (c), com COV_t = 1,03 (correlacao global E_PMT-N, SD(log10) = 0,37, mesma fonte).
 
 Sensibilidade (C2): (i) indices de Sobol por fatorial completo na faixa larga muE = 15-70 MPa
 (saida P(delta > 25 mm), quase um degrau); (ii) condicional, muE = 35-45 MPa; (iii) condicional a
@@ -34,7 +35,7 @@ VIRG = FuncFormatter(lambda v, _: f"{v:g}".replace(".", ","))
 D = os.path.join(os.path.dirname(os.path.abspath(__file__)), "out", "cenarios")
 G0 = 9.81
 EQUIP = {"C1": (37.0, 3.50, 3.955), "C2": (77.0, 4.20, 4.866), "C3": (37.0, 3.50, 3.955)}
-MR_BASE, MUE_BASE, COVT = 3.0, 40e3, 0.2
+MR_BASE, MUE_BASE, COVT = 3.0, 40e3, 0.28  # COV_t: correlacao local E_D-N, SD(log10) = 0,12 (Phoon; Kulhawy, 1999b, p. 636)
 MR_LEV = (1.5, 2.0, 2.5, 3.0)
 MUE_LEV = (15e3, 25e3, 40e3, 55e3, 70e3)
 MUE_COND = (35e3, 37.5e3, 40e3, 42.5e3, 45e3)
@@ -132,6 +133,7 @@ if __name__ == "__main__":
             a_det_media=det / 1e3, b_det_caracteristico=det / SANDRONI_KF / 1e3,
             c_prob_variabilidade=mu_min(G[:, 0], qB) / 1e3,
             d_prob_com_transformacao=mu_min(G[:, 0] / eps_samples(len(G), COVT), qB) / 1e3,
+            e_prob_correlacao_global=mu_min(G[:, 0] / eps_samples(len(G), 1.03), qB) / 1e3,
             N_a=(det / 1e3 / 0.6) ** (1 / 1.4), N_b=(det / 1e3 / 0.4) ** (1 / 1.4),
             N_c=(mu_min(G[:, 0], qB) / 1e3 / 0.6) ** (1 / 1.4),
             N_d=(mu_min(G[:, 0] / eps_samples(len(G), COVT), qB) / 1e3 / 0.6) ** (1 / 1.4))
