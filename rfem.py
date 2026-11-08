@@ -2,10 +2,12 @@
 Reproducao preliminar (RFEM 2D) - Ahmed & Hussain (2020), J. Univ. Duhok 23(2):617-629.
 Sapata corrida rigida, B = 1 m, camada H = 2 m sobre base rigida, estado plano de deformacao.
 Malha Q4 120 x 40 (elemento 0,05 m -> largura 6 m, 2,5B de cada lado da sapata).
-E lognormal, nu = 0,3 fixo, carga 100 kN/m. Correlacao Markov rho = exp(-2 tau / theta).
+E lognormal, nu = 0,3 fixo, carga 100 kN/m. Correlacao markoviana de 2a ordem separavel,
+como em Ahmed & Hussain (2020): rho = prod_i (1 + 4|tau_i|/theta) exp(-4|tau_i|/theta).
+Opcao 'markov1' (rho = exp(-2 tau/theta), isotropica) mantida para comparacao.
 Campo gerado por decomposicao de Cholesky da matriz de covariancia das MEDIAS LOCAIS
 (aproximacao da LAS por quadratura de Gauss 2x2 por elemento).
-Uso: python3 rfem.py  (gera resultados em ./out)
+Uso: python3 rfem.py [N] [markov2|markov1]  (padrao: N = 2000, markov2; resultados em ./out)
 """
 import json, time, os, sys
 import numpy as np
@@ -82,7 +84,13 @@ class Model:
         return P / F
 
 # ------------------------------------------------------------ campo aleatorio
-def local_avg_cov(cent, a, b, theta):
+def rho_fn(dx, dy, theta, kind="markov1"):
+    if kind == "markov1":
+        return np.exp(-2 * np.sqrt(dx ** 2 + dy ** 2) / theta)
+    tx, ty = 4 * np.abs(dx) / theta, 4 * np.abs(dy) / theta
+    return (1 + tx) * (1 + ty) * np.exp(-(tx + ty))
+
+def local_avg_cov(cent, a, b, theta, kind="markov1"):
     """Correlacao entre medias locais (Gauss 2x2 em cada elemento)."""
     g = 1 / np.sqrt(3)
     offs = [(sx * g * a / 2, sy * g * b / 2) for sx in (-1, 1) for sy in (-1, 1)]
@@ -91,12 +99,11 @@ def local_avg_cov(cent, a, b, theta):
         p1 = cent + [ox1, oy1]
         for (ox2, oy2) in offs:
             p2 = cent + [ox2, oy2]
-            d = np.sqrt((p1[:, None, 0] - p2[None, :, 0]) ** 2 + (p1[:, None, 1] - p2[None, :, 1]) ** 2)
-            C += np.exp(-2 * d / theta)
+            C += rho_fn(p1[:, None, 0] - p2[None, :, 0], p1[:, None, 1] - p2[None, :, 1], theta, kind)
     return C / 16.0
 
-def gen_fields(m, theta, cov_E, muE, N, rng):
-    C = local_avg_cov(m.cent, m.a, m.b, theta)
+def gen_fields(m, theta, cov_E, muE, N, rng, kind="markov1"):
+    C = local_avg_cov(m.cent, m.a, m.b, theta, kind)
     C[np.diag_indices_from(C)] += 1e-10
     L = cholesky(C, lower=True)
     s2 = np.log(1 + cov_E ** 2); s = np.sqrt(s2); mu = np.log(muE) - s2 / 2
@@ -109,7 +116,8 @@ if __name__ == "__main__":
     muE, P = 4000.0, 100.0  # kPa, kN/m
     # 1) Verificacao deterministica + convergencia de malha
     conv = []
-    for nx, ny in [(30, 10), (60, 20), (120, 40), (240, 80)]:
+    # malhas com as bordas da sapata (x = +-0,5 m) coincidentes com nos
+    for nx, ny in [(60, 20), (120, 40), (240, 80), (480, 160)]:
         t = time.time(); m = Model(nx, ny)
         s = m.settlement(np.full(m.ne, muE), P)
         conv.append({"nx": nx, "ny": ny, "h_m": 6.0 / nx, "s_mm": s * 1e3, "t_s": time.time() - t})
@@ -120,13 +128,15 @@ if __name__ == "__main__":
     s_det = m.settlement(np.full(m.ne, muE), P); res["s_det_mm"] = s_det * 1e3
 
     # 2) Monte Carlo
-    N = int(sys.argv[1]) if len(sys.argv) > 1 else 1000
+    N = int(sys.argv[1]) if len(sys.argv) > 1 else 2000
+    KIND = sys.argv[2] if len(sys.argv) > 2 else "markov2"
+    res["correlacao"] = KIND
     rng = np.random.default_rng(20261106)
     cases = [(c, th) for c in (0.1, 0.3, 0.5) for th in (0.05, 0.5, 1.0, 5.0, 20.0)]
     mc = []
     for cov_E, th in cases:
         t = time.time()
-        Ef, vr = gen_fields(m, th, cov_E, muE, N, rng)
+        Ef, vr = gen_fields(m, th, cov_E, muE, N, rng, KIND)
         s = np.array([m.settlement(Ef[:, k], P) for k in range(N)]) * 1e3
         ln = np.log(s)
         row = {"COV_E": cov_E, "theta_m": th, "N": N, "gamma_elem": vr,

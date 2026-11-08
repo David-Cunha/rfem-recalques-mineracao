@@ -1,5 +1,5 @@
 """
-Cenarios de fundacao de equipamentos de mineracao (C1-C4) - RFEM 2D com Monte Carlo.
+Cenarios de fundacao de equipamentos de mineracao (C1-C3) - RFEM 2D com Monte Carlo.
 
 Saida NORMALIZADA: com o modelo elastico linear e E(x) = muE * Etil(x) (Etil com media 1),
 o recalque de cada sapata e
@@ -11,18 +11,18 @@ Por isso uma unica simulacao por (geometria, COV_E, theta) serve para qualquer q
 Geometria (seção 4.3 da monografia):
   C1  B = 3,50 m  (Kubria G150)       H = 3B   dominio 6B
   C2  B = 4,20 m  (Kubria M210)       H = 3B   dominio 6B
-  C3  B = 21,0 m  (radier de moinho)  H = B    dominio 6B
-  C4  duas sapatas B = 3,50 m, afastamento entre eixos s = 2B, 4B, 6B; H = 3B; dominio s + 6B
-Malha: nB elementos na largura B (nB par; 12 em C1, C2 e C4; 28 em C3, elemento de 0,75 m).
+  C3  duas sapatas B = 3,50 m, afastamento entre eixos s = 2B, 4B, 6B; H = 3B; dominio s + 6B
+Malha: nB = 12 elementos na largura B (nB par, bordas da sapata nos nos).
 Correlacao markoviana rho = exp(-2 sqrt((dx/thx)^2 + (dy/thy)^2)); isotropica se thx = thy.
 Campo por medias locais (Gauss 2x2) e Cholesky, como em rfem.py.
 
 Uso:
   python cenarios.py convergencia          # estudo de malha deterministico
   python cenarios.py base [N]              # caso base (COV 0,4; theta 2 m) de todos os cenarios
-  python cenarios.py grade CENARIO [N]     # grade COV x theta (CENARIO = C2 ou C4)
-  python cenarios.py aniso [N]             # thh = 40 m, thv = 2 m em C2 e C4
-  python cenarios.py h4 [N]                # C4_4B, COV 0,4, theta = 50 e 200 m (teste da hipotese H4)
+  python cenarios.py grade CENARIO [N]     # grade COV x theta (CENARIO = C2 ou C3)
+  python cenarios.py aniso [N]             # thh = 40 m, thv = 2 m em C2 e C3
+  python cenarios.py h4 [N]                # C3_4B, COV 0,4, theta = 10, 14, 30, 50 e 200 m (pico do diferencial)
+  python cenarios.py tendencia [N]         # C2 com modulo crescente com a profundidade (caso base)
 """
 import sys, os, json, time
 import numpy as np
@@ -39,10 +39,9 @@ SEED = 20261107
 GEOM = {
     "C1": dict(B=3.50, Hr=3.0, s=None, nB=12),
     "C2": dict(B=4.20, Hr=3.0, s=None, nB=12),
-    "C3": dict(B=21.0, Hr=1.0, s=None, nB=28),
-    "C4_2B": dict(B=3.50, Hr=3.0, s=2.0, nB=12),
-    "C4_4B": dict(B=3.50, Hr=3.0, s=4.0, nB=12),
-    "C4_6B": dict(B=3.50, Hr=3.0, s=6.0, nB=12),
+    "C3_2B": dict(B=3.50, Hr=3.0, s=2.0, nB=12),
+    "C3_4B": dict(B=3.50, Hr=3.0, s=4.0, nB=12),
+    "C3_6B": dict(B=3.50, Hr=3.0, s=6.0, nB=12),
 }
 
 
@@ -99,22 +98,38 @@ def local_avg_corr(cent, a, b, thx, thy):
     return C / 16.0
 
 
-def simulate(name, cov, thx, thy, N, rng):
+# Perfil medio de N_SPT do Sitio 1 de Guerra Colque et al. (2025, Tabela 2), 1 a 17 m
+Z_N = np.arange(1, 18)
+N_SPT = np.array([6.65, 9.35, 10.2, 14.15, 12.25, 15.25, 17.3, 19.15, 22.05, 23.1, 25.25,
+                  26.45, 30.2, 32.95, 35.45, 38.75, 42.95])
+
+
+def trend_factor(m):
+    """f(z) proporcional a N(z)^1,4 (forma da correlacao de Sandroni); a escala e ajustada em simulate()."""
+    z = -m.cent[:, 1]
+    f = np.interp(z, Z_N, N_SPT) ** 1.4
+    return f / f.mean()
+
+
+def simulate(name, cov, thx, thy, N, rng, trend=False, tag_extra=""):
     m = Footings(**GEOM[name])
     t0 = time.time()
-    g_det = m.g(np.ones(m.ne))
+    f = np.ones(m.ne)
+    if trend:  # escala da tendencia ajustada para o mesmo recalque deterministico do caso homogeneo
+        f = trend_factor(m); f = f * m.g(f)[0] / m.g(np.ones(m.ne))[0]
+    g_det = m.g(f)
     L = cholesky(local_avg_corr(m.cent, m.a, m.b, thx, thy) + 1e-10 * np.eye(m.ne), lower=True)
     s2 = np.log(1 + cov ** 2); mu = -s2 / 2
     G = np.empty((N, len(m.feet)))
     for k0 in range(0, N, 200):
         k1 = min(N, k0 + 200)
-        Et = np.exp(mu + np.sqrt(s2) * (L @ rng.standard_normal((m.ne, k1 - k0))))
+        Et = f[:, None] * np.exp(mu + np.sqrt(s2) * (L @ rng.standard_normal((m.ne, k1 - k0))))
         for k in range(k1 - k0):
             G[k0 + k] = m.g(Et[:, k])
-    tag = f"{name}_cov{cov}_thx{thx}_thy{thy}"
+    tag = f"{name}_cov{cov}_thx{thx}_thy{thy}{tag_extra}"
     np.save(os.path.join(OUT, tag + ".npy"), G)
     g1 = G[:, 0]
-    row = dict(cenario=name, B=m.B, H=m.H, W=m.W, malha=[m.nx, m.ny], L=m.L, COV_E=cov,
+    row = dict(cenario=name + tag_extra, B=m.B, H=m.H, W=m.W, malha=[m.nx, m.ny], L=m.L, COV_E=cov,
                theta_x=thx, theta_y=thy, N=N, g_det=float(g_det[0]),
                g_mean=float(g1.mean()), g_std=float(g1.std(ddof=1)),
                g_p05=float(np.percentile(g1, 5)), g_p50=float(np.percentile(g1, 50)),
@@ -140,7 +155,7 @@ if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "base"
     if mode == "convergencia":
         res = []
-        for name, nBs in [("C1", (6, 12, 24, 48)), ("C3", (14, 28, 56))]:
+        for name, nBs in [("C1", (6, 12, 24, 48))]:
             for nB in nBs:
                 gm = dict(GEOM[name]); gm["nB"] = nB
                 m = Footings(**gm); t = time.time()
@@ -155,18 +170,24 @@ if __name__ == "__main__":
         save(rows, "base.json")
     elif mode == "grade":
         name = sys.argv[2]; N = int(sys.argv[3]) if len(sys.argv) > 3 else 2000
-        name = {"C4": "C4_4B"}.get(name, name)
-        rng = np.random.default_rng(SEED + (1 if name.startswith("C4") else 0))
+        name = {"C3": "C3_4B"}.get(name, name)
+        rng = np.random.default_rng(SEED + (1 if name.startswith("C3") else 0))
         rows = [simulate(name, c, th, th, N, rng) for c in (0.1, 0.2, 0.3, 0.4, 0.5)
                 for th in (0.5, 1.0, 2.0, 5.0, 20.0)]
         save(rows, f"grade_{name}.json")
     elif mode == "aniso":
         N = int(sys.argv[2]) if len(sys.argv) > 2 else 2000
         rng = np.random.default_rng(SEED + 2)
-        rows = [simulate(n, 0.4, 40.0, 2.0, N, rng) for n in ("C2", "C4_4B")]
+        rows = [simulate(n, 0.4, 40.0, 2.0, N, rng) for n in ("C2", "C3_4B")]
         save(rows, "aniso.json")
     elif mode == "h4":
         N = int(sys.argv[2]) if len(sys.argv) > 2 else 2000
         rng = np.random.default_rng(SEED + 3)
-        rows = [simulate("C4_4B", 0.4, th, th, N, rng) for th in (50.0, 200.0)]
+        done = {r["theta_x"] for r in json.load(open(os.path.join(OUT, "h4.json")))} if os.path.exists(os.path.join(OUT, "h4.json")) else set()
+        rows = [simulate("C3_4B", 0.4, th, th, N, rng) for th in (10.0, 14.0, 30.0, 50.0, 200.0) if th not in done]
         save(rows, "h4.json")
+    elif mode == "tendencia":
+        N = int(sys.argv[2]) if len(sys.argv) > 2 else 2000
+        rng = np.random.default_rng(SEED + 4)
+        rows = [simulate("C2", 0.4, 2.0, 2.0, N, rng, trend=True, tag_extra="_tend")]
+        save(rows, "tendencia.json")
